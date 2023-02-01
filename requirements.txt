@@ -4,3 +4,4 @@ requests==2.28.1
 youtube_transcript_api==0.5.0
 
 
+https://blog.csdn.net/qq_40584593/article/details/110353923
