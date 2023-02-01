@@ -79,7 +79,7 @@ def translate(video_id):
 
 # TODO 剪映配字幕的优化
 def main():
-    video_link = "https://www.youtube.com/watch?v=eZe4Q_58UTU"
+    video_link = "https://www.youtube.com/watch?v=8CiErLxdaA8"
     Download_video(video_link)
     video_id = video_link.split("?v=")[1]
     Download_Subtitles(video_id)
