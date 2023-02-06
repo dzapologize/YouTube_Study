@@ -1,0 +1,43 @@
+import os
+
+from playwright.async_api import async_playwright
+from playwright.sync_api import sync_playwright
+from pygtrans import Translate
+import asyncio
+
+
+async def get_all_urls(url):
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=False, slow_mo=50)
+        page = await browser.new_page()
+        await page.goto(url)
+        # parse_item(page.content())
+        down = await page.locator("//a[contains(text(),'Download Part')]")
+        print(
+            page.locator("h2").first.inner_text(),
+        )
+        # 英语翻译中文
+        # t_text = await page.locator("h2").first.inner_text().title()
+        # client = Translate()
+        # print("t_text", t_text)
+        # os.makedirs("./metdata/{}".format(t_text), exist_ok=True)
+
+        for text in down.all_inner_texts():
+            # get href
+            the_href = page.locator(
+                "//a[contains(text(),'{}')]".format(text)
+            ).get_attribute("href")
+            # Start waiting for the download
+            async with page.expect_download() as download_info:
+                # Perform the action that initiates download
+                await page.get_by_text(text).click()
+            download = await download_info.value
+            # Wait for the download process to complete
+            print(await download.path())
+            # Save downloaded file somewhere
+            download.save_as("./download/" + the_href)
+            # download.save_as("./metdata/{}/".format(t_text) + the_href[the_href.rindex("/") + 1: len(the_href)])
+
+
+url = "https://downloadly.net/2023/02/91199/02/nft-investing-masterclass-pro-tips-about-nft-investing/14/?#/91199-udemy-182304021602.html"
+asyncio.run(get_all_urls(url))
