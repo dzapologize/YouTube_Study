@@ -1,92 +1,68 @@
-# main.py
-import json
-import os
-import time
-import requests
-from multiprocessing import cpu_count
+# SuperFastPython.com
+# download all files from a website sequentially
 from multiprocessing.pool import ThreadPool
-from playwright.sync_api import sync_playwright
-from pygtrans import Translate
 from os import makedirs
 from os.path import basename
 from os.path import join
-from urllib.request import urlopen
+from urllib.request import Request,urlopen
 from urllib.parse import urljoin
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
+from bs4 import BeautifulSoup
+import requests
+import os
+
+# url of html page that lists all files to download
+url = 'https://downloadly.net/2023/02/91199/02/nft-investing-masterclass-pro-tips-about-nft-investing/14/?#/91199-udemy-182304021602.html'
+# local directory to save all files on the html page
+
+path = 'tmp'
+
+from urllib.request import Request, urlopen
+
+# load a file from a URL, returns content of downloaded file
+def download_url(urlpath):
+    # open a connection to the server
+    req = Request(url=url,headers={'User-Agent': 'Mozilla/5.0'})
+    webpage = urlopen(req).read()
+    return webpage
+
+# decode downloaded html and extract all <a href=""> links
+def get_urls_from_html(content):
+    # decode the provided content as ascii text
+    html = content.decode('utf-8')
+    # parse the document as best we can
+    soup = BeautifulSoup(html, 'html.parser')
+    # find all all of the <a href=""> tags in the document
+    atags = soup.find_all('a')
+    # get all href values (links) or None if not present (unlikely)
+    return [t.get('href', None) for t in atags]
+
+data = download_url(url)
+makedirs(path, exist_ok=True)
+links = get_urls_from_html(data)
+the_link = []
 
 
-def get_all_urls(url):
-    download_urls = []
-    local_fns = []
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch()
-        page = browser.new_page()
-        page.goto(url)
-        # parse_item(page.content())
-        page.locator("//span[normalize-space()='User Dashboard']").click()
-        page.fill("(//input[@id='username'])[1]", "ad")
-        page.fill("(//input[@id='password'])[1]", "x@2LNnCFQHuE@qY")
-        page.locator("(//button[normalize-space()='Login'])[1]").click()
-        time.sleep(3)
-        page.goto(url)
-        down = page.locator("//a[contains(text(),'Download Part')]")
-        print(
-            page.locator("h2").first.inner_text(),
-        )
-        # 英语翻译中文
-        t_text = page.locator("h2").first.inner_text().title()
-        client = Translate()
-        print("t_text", t_text)
-        os.makedirs("./metdata/{}".format(t_text), exist_ok=True)
-        for text in down.all_inner_texts():
-            the_href = page.locator(
-                "//a[contains(text(),'{}')]".format(text)
-            ).get_attribute("href")
-            with page.expect_download() as download_info:
-                page.get_by_text(text).click()
-            download = download_info.value
-            print(download.path())
-            download.save_as(
-                "./metdata/{}/".format(t_text)
-                + the_href[the_href.rindex("/") + 1: len(the_href)]
-            )
-
-    print("download_urls", download_urls)
-    print("local_fns", local_fns)
-    inputs = zip(download_urls, local_fns)
-    return inputs
+def download_file(url):
+    local_filename = url.split('/')[-1]
+    path = local_filename.split('.')[0]
+    os.makedirs(path,exist_ok=True)
+    # NOTE the stream=True parameter below
+    with requests.get(url, stream=True) as r:
+        r.raise_for_status()
+        with open(path + '/' + local_filename, 'wb') as f:
+            for chunk in r.iter_content(): 
+                # If you have chunk encoded response uncomment if
+                # and set chunk_size parameter to None.
+                #if chunk: 
+                f.write(chunk)
+    return local_filename
 
 
-# download all files on the provided webpage to the provided path
-def download_all_files(url, path):
-    # download the html webpage
-    data = download_url(url)
-    # create a local directory to save files
-    makedirs(path, exist_ok=True)
-    # parse html and retrieve all href urls listed
-    links = get_urls_from_html(data)
-    # report progress
-    print(f'Found {len(links)} links in {url}')
-    # create the pool of worker threads
-    with ThreadPoolExecutor(max_workers=20) as exe:
-        # dispatch all download tasks to worker threads
-        futures = [exe.submit(download_url_to_file, url, link, path) for link in links]
-        # report results as they become available
-        for future in as_completed(futures):
-            # retrieve result
-            link, outpath = future.result()
-            # check for a link that was skipped
-            if outpath is None:
-                print(f'>skipped {link}')
-            else:
-                print(f'Downloaded {link} to {outpath}')
+for link in links:
+    if link is not None and "_Downloadly.ir.rar" in link:
+        download_file(link)
 
 
-def main(url):
-    inputs = get_all_urls(url)
 
-
-if __name__ == "__main__":
-    url = "https://downloadly.net/2023/02/91199/02/nft-investing-masterclass-pro-tips-about-nft-investing/14/?#/91199-udemy-182304021602.html"
-    main(url)
